@@ -2,166 +2,100 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI 颜值大检定</title>
     <style>
-        body { 
-            font-family: 'Microsoft YaHei', sans-serif; 
-            text-align: center; 
-            background-color: #f4f7f6; 
-            padding: 50px; 
-            margin: 0;
-        }
-        .container { 
-            background: white; 
-            padding: 40px; 
-            border-radius: 20px; 
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1); 
-            display: inline-block; 
-            max-width: 90%;
-        }
-        h1 { color: #2d3436; margin-bottom: 10px; }
-        p { color: #636e72; margin-bottom: 30px; }
-        
-        /* 预览图样式 */
-        #preview { 
-            max-width: 100%; 
-            max-height: 400px; 
-            margin: 20px auto; 
-            border-radius: 12px; 
-            display: none; 
-            border: 3px solid #eee;
-        }
-
-        /* 结果显示区 */
-        #result { margin-top: 25px; min-height: 60px; }
-        .score-box { font-size: 24px; color: #333; }
-        .score-value { 
-            font-size: 56px; 
-            color: #ff4757; 
-            font-weight: bold; 
-            display: block;
-            margin-top: 10px;
-        }
-
-        /* 按钮样式 */
-        .btn-group { margin-top: 20px; }
+        body { font-family: sans-serif; text-align: center; background-color: #f4f7f6; padding: 50px; }
+        .container { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); display: inline-block; }
+        #preview { max-width: 300px; margin-top: 20px; border-radius: 10px; display: none; }
+        #result { margin-top: 20px; font-size: 24px; color: #333; }
+        .score { font-size: 48px; color: #ff4757; font-weight: bold; }
+        .upload-label { background-color: #00b894; color: white; padding: 10px 25px; border-radius: 5px; cursor: pointer; display: inline-block; }
+        button { background-color: #1e90ff; color: white; border: none; padding: 10px 25px; border-radius: 5px; cursor: pointer; font-size: 16px; margin-top: 20px; }
         input[type="file"] { display: none; }
-        .upload-label {
-            background-color: #00b894;
-            color: white;
-            padding: 12px 30px;
-            border-radius: 50px;
-            cursor: pointer;
-            display: inline-block;
-            transition: 0.3s;
-        }
-        button {
-            background-color: #0984e3;
-            color: white;
-            border: none;
-            padding: 12px 40px;
-            border-radius: 50px;
-            cursor: pointer;
-            font-size: 18px;
-            margin-top: 20px;
-            transition: 0.3s;
-        }
-        button:hover, .upload-label:hover { opacity: 0.8; transform: translateY(-2px); }
-        button:disabled { background-color: #b2bec3; cursor: not-allowed; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>✨ AI 颜值大检定 ✨</h1>
-        <p>基于百度AI技术，精准识别你的魅力指数</p>
-
-        <!-- 文件上传 -->
-        <label for="imageInput" class="upload-label">📸 选择或拍摄照片</label>
-        <input type="file" id="imageInput" accept="image/*">
+        <p>上传照片，看看你的魅力值！</p>
         
-        <!-- 修正后的预览图 -->
+        <!-- 使用 Label 触发隐藏的 input -->
+        <label for="fileInput" class="upload-label">选择照片</label>
+        <input type="file" id="fileInput" accept="image/*">
+        
+        <br>
         <img id="preview" src="" alt="预览图">
-
+        <br>
+        
+        <button id="detectBtn" onclick="detectFace()">开始检定</button>
         <div id="result"></div>
-
-        <div class="btn-group">
-            <button id="detectBtn" onclick="detectFace()">立即检定</button>
-        </div>
     </div>
 
     <script>
-        const imageInput = document.getElementById('imageInput');
+        const fileInput = document.getElementById('fileInput');
         const preview = document.getElementById('preview');
         const resultDiv = document.getElementById('result');
-        const detectBtn = document.getElementById('detectBtn');
 
-        // 修复 createObjectURL 错误的关键：获取 files
-        imageInput.onchange = function() {
+        // 彻底修复 createObjectURL 报错的关键
+        fileInput.onchange = function() {
+            // 必须使用  获取具体文件对象
             if (this.files && this.files) {
                 const file = this.files;
                 
-                // 校验大小：百度 API 限制 Base64 后不超过 2M
-                if (file.size > 1.5 * 1024 * 1024) {
-                    alert("图片太大了，请选择 1.5MB 以下的图片（编码后需小于 2MB）");
-                    this.value = '';
+                // 校验大小：百度 API 要求 Base64 编码后的图片小于 2M
+                if (file.size > 2 * 1024 * 1024) {
+                    alert("图片太大了，请上传 2MB 以内的图片");
+                    this.value = ''; // 清空选择
                     return;
                 }
 
-                // 显示预览图
+                // 释放之前的 URL 以节省内存
+                if (preview.src) URL.revokeObjectURL(preview.src);
+                
+                // 正确生成预览 URL
                 preview.src = URL.createObjectURL(file);
                 preview.style.display = 'block';
-                resultDiv.innerHTML = "";
+                resultDiv.innerHTML = ""; 
             }
         };
 
         async function detectFace() {
-            if (!imageInput.files) {
-                alert("请先上传一张帅气/漂亮的照片！");
+            // 这里的 fileInput.files 也是关键
+            if (!fileInput.files || !fileInput.files) {
+                alert("请先选择一张照片！");
                 return;
             }
 
-            // 交互状态更新
-            detectBtn.disabled = true;
-            resultDiv.innerHTML = "正在连接 AI 实验室进行分析... ⏳";
-
-            // 读取文件并转换为 Base64
+            resultDiv.innerHTML = "正在努力计算中... ⏳";
+            const file = fileInput.files;
             const reader = new FileReader();
-            reader.readAsDataURL(imageInput.files);
-            
+
+            reader.readAsDataURL(file);
             reader.onload = async function() {
-                // 提取纯 Base64 字符串（去掉 data:image/xxx;base64, 前缀）
-                const base64Data = reader.result.split(',')[1];
+                // 百度 API 只需要逗号后的 Base64 纯数据 [1]
+                const base64Data = reader.result.split(',')[2];
 
                 try {
-                    // 请求 Netlify Functions 后端
+                    // 请求 Netlify Functions 后端路径
                     const response = await fetch('/.netlify/functions/detect', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ image: base64Data })
                     });
-
+                    
                     const data = await response.json();
 
                     if (data.error_code === 0 && data.result) {
-                        // 获取颜值分 (0-100) [2, 3]
+                        // 提取来源中提到的 beauty 字段 [3, 4]
                         const beauty = data.result.face_list.beauty;
-                        resultDiv.innerHTML = `
-                            <div class="score-box">
-                                检定结果：
-                                <span class="score-value">${beauty} 分</span>
-                            </div>
-                        `;
+                        resultDiv.innerHTML = `您的颜值分数为：<br><span class="score">${beauty}</span> / 100`;
                     } else {
-                        // 处理常见错误，如没有人脸 [4]
-                        let msg = data.error_msg || "检测失败";
-                        if (data.error_code === 222202) msg = "图中没有人脸，请换一张试试";
-                        resultDiv.innerHTML = `<span style="color:red;">❌ ${msg}</span>`;
+                        // 处理常见错误码，如 222202 (未检测到人脸) [5, 6]
+                        let errorMsg = data.error_msg || "检测失败";
+                        if (data.error_code === 222202) errorMsg = "图中没有人脸，请换一张试试";
+                        resultDiv.innerHTML = `<span style="color:red;">❌ ${errorMsg}</span>`;
                     }
                 } catch (error) {
-                    resultDiv.innerHTML = `<span style="color:red;">网络连接异常，请检查 Netlify 配置</span>`;
-                } finally {
-                    detectBtn.disabled = false;
+                    resultDiv.innerHTML = `<span style="color:red;">服务器连接出错，请检查部署。</span>`;
                 }
             };
         }
