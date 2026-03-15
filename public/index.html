@@ -2,54 +2,166 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>AI 颜值检定</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 颜值大检定</title>
     <style>
-        /* 这里保留你之前的 CSS 样式 */
-        body { font-family: sans-serif; text-align: center; padding: 50px; background: #f0f2f5; }
-        .card { background: white; padding: 20px; border-radius: 10px; display: inline-block; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        #preview { max-width: 300px; display: none; margin: 20px auto; }
-        .score { font-size: 3em; color: #ff4757; font-weight: bold; }
+        body { 
+            font-family: 'Microsoft YaHei', sans-serif; 
+            text-align: center; 
+            background-color: #f4f7f6; 
+            padding: 50px; 
+            margin: 0;
+        }
+        .container { 
+            background: white; 
+            padding: 40px; 
+            border-radius: 20px; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1); 
+            display: inline-block; 
+            max-width: 90%;
+        }
+        h1 { color: #2d3436; margin-bottom: 10px; }
+        p { color: #636e72; margin-bottom: 30px; }
+        
+        /* 预览图样式 */
+        #preview { 
+            max-width: 100%; 
+            max-height: 400px; 
+            margin: 20px auto; 
+            border-radius: 12px; 
+            display: none; 
+            border: 3px solid #eee;
+        }
+
+        /* 结果显示区 */
+        #result { margin-top: 25px; min-height: 60px; }
+        .score-box { font-size: 24px; color: #333; }
+        .score-value { 
+            font-size: 56px; 
+            color: #ff4757; 
+            font-weight: bold; 
+            display: block;
+            margin-top: 10px;
+        }
+
+        /* 按钮样式 */
+        .btn-group { margin-top: 20px; }
+        input[type="file"] { display: none; }
+        .upload-label {
+            background-color: #00b894;
+            color: white;
+            padding: 12px 30px;
+            border-radius: 50px;
+            cursor: pointer;
+            display: inline-block;
+            transition: 0.3s;
+        }
+        button {
+            background-color: #0984e3;
+            color: white;
+            border: none;
+            padding: 12px 40px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 18px;
+            margin-top: 20px;
+            transition: 0.3s;
+        }
+        button:hover, .upload-label:hover { opacity: 0.8; transform: translateY(-2px); }
+        button:disabled { background-color: #b2bec3; cursor: not-allowed; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h1>颜值检定服务器</h1>
-        <input type="file" id="fileInput" accept="image/*">
-        <img id="preview">
+    <div class="container">
+        <h1>✨ AI 颜值大检定 ✨</h1>
+        <p>基于百度AI技术，精准识别你的魅力指数</p>
+
+        <!-- 文件上传 -->
+        <label for="imageInput" class="upload-label">📸 选择或拍摄照片</label>
+        <input type="file" id="imageInput" accept="image/*">
+        
+        <!-- 修正后的预览图 -->
+        <img id="preview" src="" alt="预览图">
+
         <div id="result"></div>
-        <button onclick="uploadImage()">开始检测</button>
+
+        <div class="btn-group">
+            <button id="detectBtn" onclick="detectFace()">立即检定</button>
+        </div>
     </div>
 
     <script>
-        const fileInput = document.getElementById('fileInput');
-        fileInput.onchange = () => {
-            const file = fileInput.files;
-            document.getElementById('preview').src = URL.createObjectURL(file);
-            document.getElementById('preview').style.display = 'block';
+        const imageInput = document.getElementById('imageInput');
+        const preview = document.getElementById('preview');
+        const resultDiv = document.getElementById('result');
+        const detectBtn = document.getElementById('detectBtn');
+
+        // 修复 createObjectURL 错误的关键：获取 files
+        imageInput.onchange = function() {
+            if (this.files && this.files) {
+                const file = this.files;
+                
+                // 校验大小：百度 API 限制 Base64 后不超过 2M
+                if (file.size > 1.5 * 1024 * 1024) {
+                    alert("图片太大了，请选择 1.5MB 以下的图片（编码后需小于 2MB）");
+                    this.value = '';
+                    return;
+                }
+
+                // 显示预览图
+                preview.src = URL.createObjectURL(file);
+                preview.style.display = 'block';
+                resultDiv.innerHTML = "";
+            }
         };
 
-        async function uploadImage() {
-            const file = fileInput.files;
-            if (!file) return alert("请选择图片");
+        async function detectFace() {
+            if (!imageInput.files) {
+                alert("请先上传一张帅气/漂亮的照片！");
+                return;
+            }
 
+            // 交互状态更新
+            detectBtn.disabled = true;
+            resultDiv.innerHTML = "正在连接 AI 实验室进行分析... ⏳";
+
+            // 读取文件并转换为 Base64
             const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = async () => {
-                const base64Str = reader.result.split(',')[8];
-                document.getElementById('result').innerText = "检测中...";
+            reader.readAsDataURL(imageInput.files);
+            
+            reader.onload = async function() {
+                // 提取纯 Base64 字符串（去掉 data:image/xxx;base64, 前缀）
+                const base64Data = reader.result.split(',')[1];
 
-                // 注意：路径修改为 Netlify 默认的函数路由
-                const res = await fetch('/.netlify/functions/detect', {
-                    method: 'POST',
-                    body: JSON.stringify({ image: base64Str })
-                });
-                
-                const data = await res.json();
-                if (data.result) {
-                    const beauty = data.result.face_list.beauty;
-                    document.getElementById('result').innerHTML = `颜值分：<div class="score">${beauty}</div>`;
-                } else {
-                    document.getElementById('result').innerText = "未检测到人脸，请重试";
+                try {
+                    // 请求 Netlify Functions 后端
+                    const response = await fetch('/.netlify/functions/detect', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ image: base64Data })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.error_code === 0 && data.result) {
+                        // 获取颜值分 (0-100) [2, 3]
+                        const beauty = data.result.face_list.beauty;
+                        resultDiv.innerHTML = `
+                            <div class="score-box">
+                                检定结果：
+                                <span class="score-value">${beauty} 分</span>
+                            </div>
+                        `;
+                    } else {
+                        // 处理常见错误，如没有人脸 [4]
+                        let msg = data.error_msg || "检测失败";
+                        if (data.error_code === 222202) msg = "图中没有人脸，请换一张试试";
+                        resultDiv.innerHTML = `<span style="color:red;">❌ ${msg}</span>`;
+                    }
+                } catch (error) {
+                    resultDiv.innerHTML = `<span style="color:red;">网络连接异常，请检查 Netlify 配置</span>`;
+                } finally {
+                    detectBtn.disabled = false;
                 }
             };
         }
